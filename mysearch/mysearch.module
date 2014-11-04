@@ -1,0 +1,67 @@
+<?php
+
+/**
+ * Implementation of hook_permission().
+ */
+function mysearch_permission() {
+  return array(
+    'access mysearch' => array(
+      'title' => 'Access My Search',
+      'description' => 'Allows a user to access search results',
+    )
+  );
+}
+
+
+/**
+ * Implementation of hook_menu().
+ */
+function mysearch_menu() {
+  $items['mysearch/%'] = array(
+    'title' => 'Search for @searchterm',
+    'title arguments' => array('@searchterm' => 1),
+    'page callback' => 'mysearch_searchpage',
+    'page arguments' => array(1),
+    'access arguments' => array('access mysearch'),
+    'type' => MENU_SUGGESTED_ITEM,
+  );
+  return $items;
+}
+
+
+/**
+ * Menu callback provides a simple list of nodes matching the
+ * search term Example: hitting the URL:
+ *   http://domain.com/mysearch/example
+ * will return a list of links to nodes which have the word
+ * example in them.
+ */
+function mysearch_searchpage($searchterm = NULL) {
+
+  if(!$searchterm){
+    drupal_not_found();
+  }
+  $output = '';
+  //DataBase query for search string. Return node title and nid
+  $query = db_select('field_data_body', 'fdb');
+  $query->leftJoin('node', 'n', "n.nid = fdb.entity_id");
+  $query->fields('fdb', array('entity_id'))
+    ->fields('n', array('title'))
+    ->condition('fdb.body_value', '%' . db_like($searchterm) . '%', 'LIKE')
+    ->condition('fdb.entity_type', 'node');
+  $ids = $query->execute();
+  //create an array of results
+  $items = array();
+  while ($record = $ids->fetchAssoc()) {
+    $items[] = l($record['title'], 'node/' . $record['entity_id']);
+  }
+  if(count($items)){
+    //theme output as list
+    $output .= theme('item_list', array('items' => $items));
+  } else {
+    //No results
+    $output .= t('No results has been found for %searchterm', array('%searchterm' => $searchterm));
+  }
+
+  return $output;
+}
